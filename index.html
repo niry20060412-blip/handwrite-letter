@@ -1,0 +1,1927 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>手写信视频生成器</title>
+<style>
+  @font-face{
+    font-family:'HandFont';
+    src:url('XianSheng-GaiZenMeChengNi-2.ttf') format('truetype');
+    font-weight:normal;
+    font-style:normal;
+    font-display:swap;
+  }
+</style>
+<style>
+  :root{
+    --ink:#3a3123;
+    --accent:#8a6d3b;
+    --btn:#6b4f2a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:"Microsoft YaHei","PingFang SC",sans-serif;
+    background:#1a1a1a;
+    color:#eee;
+    min-height:100vh;
+    padding:24px 16px 80px;
+  }
+  h1{
+    text-align:center;
+    font-size:22px;
+    color:#f0e8d8;
+    margin-bottom:4px;
+    letter-spacing:2px;
+  }
+  .sub{
+    text-align:center;
+    font-size:13px;
+    color:#9a8f7c;
+    margin-bottom:22px;
+  }
+
+  .stage{
+    max-width:900px;
+    margin:0 auto;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+
+  .panel{
+    background:#262626;
+    border:1px solid #3a3a3a;
+    border-radius:12px;
+    padding:16px;
+  }
+  .panel > label{
+    display:block;
+    font-size:13px;
+    color:#b8ad96;
+    margin-bottom:10px;
+    font-weight:bold;
+    letter-spacing:1px;
+  }
+  textarea{
+    width:100%;
+    height:120px;
+    border:1px solid #444;
+    border-radius:8px;
+    padding:10px;
+    font-size:14px;
+    line-height:1.7;
+    resize:vertical;
+    background:#1e1e1e;
+    color:#eee;
+    font-family:inherit;
+  }
+  textarea:focus{outline:2px solid #8a6d3b;border-color:transparent}
+
+  .row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+  .row > div{flex:1;min-width:140px}
+  .row label.sub-label{font-weight:normal;font-size:12px;color:#9a8f7c;margin-bottom:4px}
+
+  select,input[type=range]{width:100%}
+  select{
+    border:1px solid #444;border-radius:8px;padding:8px;font-size:14px;
+    background:#1e1e1e;color:#eee;
+  }
+  .range-wrap{display:flex;align-items:center;gap:10px}
+  .range-wrap output{min-width:44px;text-align:right;font-size:13px;color:#b8ad96;font-weight:bold}
+
+  .file-zone{
+    border:2px dashed #4a4438;border-radius:10px;padding:18px;text-align:center;
+    color:#9a8f7c;font-size:14px;cursor:pointer;transition:.15s;min-height:58px;
+    display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;
+  }
+  .file-zone:hover{border-color:var(--accent);background:#2a2822}
+  .file-zone.has{border-style:solid;color:#c8b98c}
+  .file-zone .hint{font-size:12px;color:#6f6859}
+
+  .btns{display:flex;gap:12px;flex-wrap:wrap}
+  button{
+    border:none;border-radius:8px;padding:12px 20px;font-size:15px;cursor:pointer;
+    font-weight:bold;letter-spacing:1px;transition:.15s;background:#333;color:#ddd;
+  }
+  button:active{transform:translateY(1px)}
+  button:hover{background:#3d3d3d}
+  .btn-main{background:var(--btn);color:#fff;flex:1;min-width:140px}
+  .btn-main:hover{background:#5a421f}
+  .btn-accent{background:#7a5a2e;color:#fff}
+  .btn-accent:hover{background:#8a6a3a}
+  .btn-red{background:#6e2f2f;color:#fff}
+  .btn-red:hover{background:#833838}
+  button:disabled{opacity:.4;cursor:not-allowed}
+
+  .preview-head{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:12px;font-size:13px;color:#b8ad96;
+  }
+
+  /* 信纸舞台 */
+  .letter-stage{
+    position:relative;
+    width:100%;
+    aspect-ratio:9/16;
+    border-radius:8px;
+    overflow:hidden;
+    background:#000;
+    --lx:27%;
+    --ty:30%;
+    --wd:46%;
+  }
+  .letter-stage .paper-img{
+    position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  }
+  .letter-stage .write-area{
+    position:absolute;
+    left:var(--lx);top:var(--ty);
+    width:var(--wd);
+    display:flex;
+    align-items:flex-start;
+    overflow:visible;
+    cursor:move;
+    /* 拖动时的可见边框 */
+    border:1.5px dashed rgba(255,255,255,.35);
+    border-radius:4px;
+    padding:2px;
+  }
+  .letter-stage .write-area.dragging{border-color:#f0e8d8;background:rgba(255,255,255,.06)}
+  .write-area .resize-h{
+    position:absolute;
+    top:0;bottom:0;width:10px;
+    cursor:ew-resize;
+  }
+  .write-area .resize-h.l{left:-6px}
+  .write-area .resize-h.r{right:-6px}
+  /* 导出视频时隐藏边框 */
+  .letter-stage.exporting .write-area{border-color:transparent;background:transparent}
+  .letter-stage.exporting .write-area .resize-h{display:none}
+  .letter{
+    width:100%;
+    font-family:'HandFont','KaiTi',serif;
+    font-size:var(--fs);
+    line-height:var(--lh);
+    color:var(--ink);
+    white-space:pre-wrap;
+    word-break:break-word;
+    letter-spacing:.02em;
+  }
+  .char{opacity:0}
+  .char.on{opacity:1}
+  .char.cur{opacity:1}
+
+  .progress{height:6px;background:#333;border-radius:3px;overflow:hidden;margin-top:14px}
+  .progress .bar{height:100%;background:var(--accent);width:0%;transition:width .05s linear}
+  .time-info{display:flex;justify-content:space-between;font-size:12px;color:#9a8f7c;margin-top:6px}
+
+  .tip{font-size:12px;color:#9a8f7c;text-align:center;margin-top:8px;line-height:1.6}
+  .hidden{display:none}
+  .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#666;margin-right:6px}
+  .status-dot.rec{background:#e33;animation:blink 1s infinite}
+  @keyframes blink{50%{opacity:.3}}
+</style>
+</head>
+<body>
+  <h1>手写信视频生成器</h1>
+  <div class="sub">粘贴文字 · 录读信配音 · 导出画面视频，后期一拼就是成品</div>
+
+  <div class="stage">
+
+    <!-- 1 文字 -->
+    <div class="panel">
+      <label>① 信的正文</label>
+      <textarea id="text" placeholder="在这里粘贴信的全文（称呼、正文、落款）&#10;&#10;例如：&#10;亲爱的妈妈：&#10;见字如面……&#10;爱你的女儿"></textarea>
+    </div>
+
+    <!-- 2 录音 + 音频 -->
+    <div class="panel">
+      <label>② 读信配音（网页直接录音，或上传现成音频）</label>
+
+      <div class="btns" style="margin-bottom:12px">
+        <button class="btn-red" id="btnRecStart">🎙 开始录音</button>
+        <button class="btn-ghost" id="btnRecPause" disabled>⏸ 暂停</button>
+        <button class="btn-ghost" id="btnRecStop" disabled>⏹ 停止并生成音频</button>
+        <button class="btn-accent" id="btnRecPlay" disabled>▶ 回放试听</button>
+        <button class="btn-accent" id="btnRecDownload" disabled>⬇ 下载录音</button>
+      </div>
+      <div class="file-zone" id="fileZone">
+        <div>或点击上传现成配音（mp3 / wav / m4a）</div>
+        <div class="hint">选好后自动读时长，逐字按总时长平均分配</div>
+      </div>
+      <input type="file" id="audioInput" accept="audio/*,.mp3,.wav,.m4a" class="hidden">
+      <div id="audioInfo" class="tip hidden" style="text-align:left;margin-top:10px"></div>
+    </div>
+
+    <!-- 3 信纸与字号 -->
+    <div class="panel">
+      <label>③ 信纸与字号</label>
+      <div class="row" style="margin-bottom:12px">
+        <div style="flex:1.3">
+          <div class="sub-label">字号：<span id="fsVal">30</span>px</div>
+          <div class="range-wrap">
+            <input type="range" id="fontSize" min="16" max="52" value="30">
+            <output id="fsOut">30</output>
+          </div>
+        </div>
+        <div>
+          <div class="sub-label">文字颜色</div>
+          <select id="inkColor">
+            <option value="#3a3123">墨黑（默认）</option>
+            <option value="#2b4a6b">钢笔蓝</option>
+            <option value="#7a2e2e">朱红</option>
+            <option value="#4a4a4a">深灰</option>
+          </select>
+        </div>
+      </div>
+      <div class="file-zone" id="paperZone" style="min-height:48px;padding:12px">
+        <div>🖼 换信纸图案：点这里上传你自己的信纸图片（jpg/png）</div>
+        <div class="hint" id="paperHint">当前使用默认复古卷轴信纸</div>
+      </div>
+      <input type="file" id="paperInput" accept="image/*,.jpg,.jpeg,.png,.webp" class="hidden">
+      <div class="tip" style="text-align:left;margin-top:8px">字体已内嵌你发的手写体「先生-盖怎么成你」；换信纸后文字位置仍在，可继续拖动校准。</div>
+    </div>
+
+    <!-- 4 播放 / 导出 -->
+    <div class="panel">
+      <label>④ 对时间 · 播放 · 导出</label>
+
+      <!-- 同步方式 -->
+      <div class="sub-label" style="margin-bottom:6px">同步方式（让字跟着真实读信节奏走）</div>
+      <div class="btns" style="margin-bottom:8px">
+        <button class="btn-accent" id="btnAutoSync" disabled>🎧 自动识别对时间（联网）</button>
+      </div>
+      <div class="tip" style="text-align:left;margin-bottom:10px" id="markInfo">
+        <b>自动识别</b>：电脑外放你的音频，同时开麦克风听，边听边自动识别节奏（要联网，Chrome/Edge）。
+        如果识别不准，可用下面的「手动打点」兜底。
+      </div>
+
+      <div class="btns" style="margin-bottom:8px">
+        <button class="btn-ghost" id="btnMarkStart" disabled>🎯 手动打点（兜底）</button>
+        <button class="btn-accent" id="btnMarkTap" disabled style="flex:1.2">⌨ 标记一句（或按空格键）</button>
+        <button class="btn-red" id="btnMarkStop" disabled>⏹ 结束打点</button>
+      </div>
+
+      <div class="btns">
+        <button class="btn-main" id="btnRecord" disabled>▶ 预览逐字播放</button>
+        <button class="btn-accent" id="btnExportVideo" disabled>🎬 导出（无声音）</button>
+        <button class="btn-accent" id="btnExportAudio" disabled>🔊 导出（带声音）</button>
+        <button class="btn-ghost" id="btnReset">重置</button>
+      </div>
+
+      <!-- 音量调节 -->
+      <div class="row" style="margin-top:12px">
+        <div>
+          <div class="sub-label">写字沙沙声：<span id="scribbleVolVal">80</span></div>
+          <div class="range-wrap">
+            <input type="range" id="scribbleVol" min="0" max="100" value="80">
+          </div>
+        </div>
+        <div>
+          <div class="sub-label">读信录音音量：<span id="voiceVolVal">100</span></div>
+          <div class="range-wrap">
+            <input type="range" id="voiceVol" min="0" max="100" value="100">
+          </div>
+        </div>
+        <div>
+          <div class="sub-label">沙沙声开关</div>
+          <select id="scribbleToggle">
+            <option value="on">开启（默认）</option>
+            <option value="off">关闭</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="tip" style="text-align:left">
+        同步完成后点「预览」看效果。「导出（带声音）」会把<b>写字沙沙声 + 读信录音</b>一起合进视频；「导出（无声音）」只出画面。
+      </div>
+    </div>
+
+    <!-- 信纸预览 -->
+    <div class="panel">
+      <div class="preview-head">
+        <span><span class="status-dot" id="statusDot"></span><span id="statusText">就绪</span></span>
+        <span id="charCount"></span>
+      </div>
+      <div class="letter-stage" id="letterStage">
+        <img class="paper-img" id="paperImg" src="信纸.jpg" alt="信纸">
+        <div class="write-area" id="writeArea">
+          <div class="resize-h l" data-side="l"></div>
+          <div class="resize-h r" data-side="r"></div>
+          <div class="letter" id="letter"></div>
+        </div>
+      </div>
+      <!-- 导出用画布（隐藏） -->
+      <canvas id="exportCanvas" style="display:none"></canvas>
+      <!-- 写字声音频（隐藏，用 <audio> 加载本地文件，避免 file:// 下 fetch 被限制） -->
+      <audio id="scribbleAudio" src="写字声.mp3?v=2" preload="auto" style="display:none"></audio>
+      <div class="time-info" style="margin-top:8px;justify-content:flex-start;gap:16px;align-items:center;flex-wrap:wrap">
+        <span>位置：左 <b id="posLeft">25%</b> · 上 <b id="posTop">15%</b> · 宽 <b id="posWidth">50%</b></span>
+        <span style="flex:1"></span>
+        <button class="btn-ghost" id="btnSavePos" style="padding:6px 12px;font-size:12px">💾 保存位置</button>
+        <button class="btn-ghost" id="btnResetPos" style="padding:6px 12px;font-size:12px">↩ 恢复默认</button>
+      </div>
+      <div class="progress"><div class="bar" id="bar"></div></div>
+      <div class="time-info">
+        <span id="curTime">0.0s</span>
+        <span id="totalTime">0.0s</span>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+(function(){
+  // ---- 元素 ----
+  const textEl    = document.getElementById('text');
+  const letterEl  = document.getElementById('letter');
+  const writeArea = document.getElementById('writeArea');
+  const letterStage=document.getElementById('letterStage');
+  const paperImg  = document.getElementById('paperImg');
+  const exportCanvas = document.getElementById('exportCanvas');
+  const scribbleAudio = document.getElementById('scribbleAudio');
+  const fileZone  = document.getElementById('fileZone');
+  const audioInput= document.getElementById('audioInput');
+  const audioInfo = document.getElementById('audioInfo');
+  const fontSize  = document.getElementById('fontSize');
+  const fsVal     = document.getElementById('fsVal');
+  const fsOut     = document.getElementById('fsOut');
+  const inkColor  = document.getElementById('inkColor');
+  const btnRecord = document.getElementById('btnRecord');
+  const btnReset  = document.getElementById('btnReset');
+  const btnExportVideo = document.getElementById('btnExportVideo');
+  const btnExportAudio = document.getElementById('btnExportAudio');
+  const scribbleVol    = document.getElementById('scribbleVol');
+  const scribbleVolVal = document.getElementById('scribbleVolVal');
+  const voiceVol       = document.getElementById('voiceVol');
+  const voiceVolVal    = document.getElementById('voiceVolVal');
+  const scribbleToggle = document.getElementById('scribbleToggle');
+  const btnRecStart   = document.getElementById('btnRecStart');
+  const btnRecStop    = document.getElementById('btnRecStop');
+  const btnRecPause   = document.getElementById('btnRecPause');
+  const btnRecPlay    = document.getElementById('btnRecPlay');
+  const btnRecDownload= document.getElementById('btnRecDownload');
+  const paperZone     = document.getElementById('paperZone');
+  const paperInput    = document.getElementById('paperInput');
+  const paperHint     = document.getElementById('paperHint');
+  const bar       = document.getElementById('bar');
+  const curTime   = document.getElementById('curTime');
+  const totalTime = document.getElementById('totalTime');
+  const statusText= document.getElementById('statusText');
+  const statusDot = document.getElementById('statusDot');
+  const charCount = document.getElementById('charCount');
+  const posLeft   = document.getElementById('posLeft');
+  const posTop    = document.getElementById('posTop');
+  const posWidth  = document.getElementById('posWidth');
+  const btnSavePos   = document.getElementById('btnSavePos');
+  const btnResetPos  = document.getElementById('btnResetPos');
+  const btnMarkStart = document.getElementById('btnMarkStart');
+  const btnMarkTap   = document.getElementById('btnMarkTap');
+  const btnMarkStop  = document.getElementById('btnMarkStop');
+  const btnAutoSync  = document.getElementById('btnAutoSync');
+  const markInfo     = document.getElementById('markInfo');
+
+  // ---- 状态 ----
+  let audioObj = null;
+  let audioURL = null;
+  let audioDuration = 0;
+  let chars = [];
+  let charIntervals = [];
+  let rafId = null;
+  let playing = false;
+  let exporting = false;
+
+  // 打点模式
+  let marking = false;          // 是否正在打点
+  let marks = [];               // 打点记录：{t, charIdx} t=时间(秒), charIdx=此时已读到第几个字
+  let markCharIndex = 0;        // 当前读到第几个字
+  let currentTimings = null;    // 当前生效的逐字时间表（打点生成 or 平均分配）
+
+  // 沙沙声（真实写字声音频）
+  let audioCtx = null;
+  let scribbleBuffer = null;        // 预解码的写字声 AudioBuffer（预览用）
+  let voiceBuffer = null;           // 预解码的读信录音 AudioBuffer（导出用，保证和 AudioContext 时钟严格同步）
+  let exportScribbleAudio = null;   // 导出时独立新建的写字声音频元素（接 Web Audio 进导出流）
+  let exportScribbleSrc = null;     // exportScribbleAudio 的 source 节点
+  let exportVoiceSrc = null;        // 导出时读信录音的 source 节点（顶层声明，供 cleanupExportAudio 使用）
+  let lastScribbleChar = -1;        // 上一次触发沙沙声的字下标
+
+  // 录音相关
+  let mediaRecorder = null;
+  let recChunks = [];
+  let recStream = null;
+  let recBlob = null;
+  let recURL = null;
+  let recPlayObj = null;
+
+  // 文字块位置（百分比）
+  const DEFAULT_POS = { lx:27, ty:30, wd:46 };
+  let pos = { ...DEFAULT_POS };
+  const STORE_KEY = 'handwrite_pos_v2';
+
+  function fmt(s){ return (isFinite(s)?s:0).toFixed(1) + 's'; }
+
+  // ---- 渲染逐字 ----
+  function renderText(){
+    const raw = textEl.value;
+    letterEl.innerHTML = '';
+    chars = [];
+    for(const ch of raw){
+      const span = document.createElement('span');
+      span.className = 'char';
+      span.textContent = ch;
+      letterEl.appendChild(span);
+      const isChar = !/\s/.test(ch);
+      chars.push({el:span, isChar, ch});
+    }
+    const n = chars.filter(c=>c.isChar).length;
+    charCount.textContent = n ? (n + ' 个字') : '';
+    applyFontSize();
+    updateRecordBtn();
+    // 预览实时检测：文字是否溢出信纸，溢出就提示（导出时会自动缩字号适配）
+    scheduleOverflowHint();
+  }
+
+  function computeTimings(){
+    const charList = chars.map(c=>c.isChar);
+    const charCountN = chars.filter(c=>c.isChar).length;
+    if(charCountN === 0 || audioDuration <= 0){ currentTimings = null; charIntervals = []; return; }
+    // 打点模式：用 marks 生成真实时间表
+    if(marks.length >= 2){
+      const marked = buildMarkedTimings(charCountN);
+      // 健壮性校验：打点/自动识别生成的 marks 可能不可靠（识别错位、时间点重复等），
+      // 若出现「最后一个字的时间超过音频时长」或「有字没分配到时间」等异常，退回平均分配，
+      // 避免导出时画面停在前面、后面的字永远不亮。
+      const vals = marked.filter(v=>v !== null);
+      const maxAt = vals.length ? Math.max(...vals) : 0;
+      const covered = vals.length;
+      // 检测"前慢后挤"异常：最后 20% 的字被塞进不足音频 5% 的时间（自动识别错位的典型特征）
+      let backSqueezed = false;
+      if(vals.length === charCountN){
+        const sortedVals = vals.slice().sort((a,b)=>a-b);
+        const cut = Math.floor(charCountN * 0.8);
+        const t80 = sortedVals[cut];              // 第 80% 个字的出现时间
+        const spanBack = audioDuration - t80;      // 后 20% 字的时间跨度
+        if(t80 >= 0 && spanBack < audioDuration * 0.05){
+          backSqueezed = true;
+        }
+      }
+      const broken = maxAt > audioDuration + 0.5 || covered < charCountN * 0.9 || backSqueezed;
+      if(broken){
+        console.warn('打点时间表异常（最大时间='+maxAt.toFixed(2)+'s / 覆盖字='+covered+'/'+charCountN+' / 后段挤压='+backSqueezed+'），退回平均分配');
+        charIntervals = buildUniformTimings(charCountN);
+      } else {
+        charIntervals = marked;
+      }
+    } else {
+      charIntervals = buildUniformTimings(charCountN);
+    }
+    currentTimings = charIntervals;
+  }
+
+  // 均匀分配：每个字按音频总时长平均分布
+  function buildUniformTimings(charCountN){
+    const step = audioDuration / charCountN;
+    const arr = [];
+    let idx = 0;
+    for(const c of chars){
+      if(c.isChar){ arr.push(idx*step); idx++; }
+      else { arr.push(null); }
+    }
+    return arr;
+  }
+
+  // 根据打点 marks 生成每个字的出现时间
+  function buildMarkedTimings(charCountN){
+    // marks 按时间排序，每段 {t0, t1, startChar, endChar}
+    const sorted = marks.slice().sort((a,b)=>a.t - b.t);
+    // 起点：0 秒、第 0 个字
+    const segments = [];
+    let prevT = 0, prevChar = 0;
+    for(const m of sorted){
+      if(m.t <= prevT) continue;      // 忽略重复/回退
+      segments.push({t0:prevT, t1:m.t, c0:prevChar, c1:m.charIdx});
+      prevT = m.t;
+      prevChar = m.charIdx;
+    }
+    // 最后一段：从最后一个 mark 到音频结束，覆盖剩余全部字
+    segments.push({t0:prevT, t1:audioDuration, c0:prevChar, c1:charCountN});
+
+    // 生成每个字的出现时间
+    const result = new Array(chars.length).fill(null);
+    let charPos = 0; // 当前分配到的字索引（只计数 isChar）
+    for(const seg of segments){
+      const span = seg.t1 - seg.t0;
+      const cnt = seg.c1 - seg.c0;
+      if(span <= 0 || cnt <= 0) continue;
+      const perChar = span / cnt;
+      for(let k=0;k<cnt;k++){
+        const targetCharPos = seg.c0 + k;
+        // 找到第 targetCharPos 个 isChar 字在 chars 里的下标
+        const arrIdx = findNthCharIndex(targetCharPos);
+        if(arrIdx !== -1){
+          result[arrIdx] = seg.t0 + k * perChar;
+        }
+      }
+    }
+    return result;
+  }
+
+  function findNthCharIndex(n){
+    let cnt = 0;
+    for(let i=0;i<chars.length;i++){
+      if(chars[i].isChar){
+        if(cnt === n) return i;
+        cnt++;
+      }
+    }
+    return -1;
+  }
+
+  function applyFontSize(){
+    const fs = parseInt(fontSize.value,10);
+    letterEl.style.fontSize = fs + 'px';
+    letterEl.style.lineHeight = (fs*1.7) + 'px';
+    writeArea.style.setProperty('--fs', fs+'px');
+    writeArea.style.setProperty('--lh', (fs*1.7)+'px');
+    fsVal.textContent = fs;
+    fsOut.textContent = fs;
+  }
+
+  function applyInk(){
+    letterEl.style.color = inkColor.value;
+  }
+
+  // ===== 文字溢出检测 + 自动缩字号 =====
+  // 根因修复：文字太多/字号太大/文字区太窄时，文字会从信纸底部溢出，
+  // 溢出部分的字坐标超出画布，导出后"画面停在前半段、后面的字看不见"。
+  // 这里检测文字是否超出信纸可视区，超出就自动缩小字号直到放得下。
+  function detectOverflow(){
+    const stageRect = letterStage.getBoundingClientRect();
+    // 文字内容区：write-area 顶部到 letter 实际内容底部
+    const wa = writeArea.getBoundingClientRect();
+    const lr = letterEl.getBoundingClientRect();
+    // 文字溢出 stage 底部的量（px）
+    const overflowBottom = lr.bottom - stageRect.bottom;
+    return {
+      overflowBottom: overflowBottom,   // >0 表示溢出底部
+      stageRect: stageRect
+    };
+  }
+
+  // 自动缩小字号直到文字放得进信纸（不小于最小值 16px）
+  function autoFitFont(){
+    const origFs = parseInt(fontSize.value,10);
+    let fs = origFs;
+    const min = parseInt(fontSize.min,10) || 16;
+    let guard = 0;
+    while(guard < 20){
+      const of = detectOverflow();
+      if(of.overflowBottom <= 1) break;   // 放得下了（留 1px 余量）
+      fs -= 2;
+      if(fs < min){ fs = min; fontSize.value = fs; applyFontSize(); break; }
+      fontSize.value = fs;
+      applyFontSize();
+      guard++;
+    }
+    // 如果缩到最小字号仍溢出，明确提示用户（避免静默失败）
+    const of2 = detectOverflow();
+    if(of2.overflowBottom > 1){
+      console.warn('文字仍超出信纸（已缩到最小字号 '+fs+'px），超出部分可能被裁掉。建议：缩短文字 / 拖大文字区 / 拖到信纸更上方');
+      setStatus('⚠️ 文字太多，即使最小字号也放不下，请删减文字或拖大文字区','');
+    }
+    if(fs < origFs){
+      setStatus('已自动缩小字号到 '+fs+'px 让文字完整放进信纸','');
+    }
+    return fs;
+  }
+
+  // 预览时防抖检测溢出，给用户提示（导出时会自动缩字号适配，保证所见即所得）
+  let _overflowTimer = null;
+  function scheduleOverflowHint(){
+    if(_overflowTimer) clearTimeout(_overflowTimer);
+    _overflowTimer = setTimeout(()=>{
+      const of = detectOverflow();
+      if(of.overflowBottom > 1){
+        // 提示但不打断：导出时 autoFitFont 会自动缩小到放得下
+        setStatus('⚠️ 文字超出信纸，导出时会自动缩小字号','');
+      }
+    }, 200);
+  }
+
+  // ============ 沙沙声（笔划纸音效） ============
+  function ensureAudioCtx(){
+    if(!audioCtx){
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if(audioCtx.state === 'suspended'){ audioCtx.resume(); }
+    return audioCtx;
+  }
+
+  // 预解码写字声为 AudioBuffer（localhost/http 下 fetch 可用）
+  // 返回 Promise<boolean>，成功与否都不阻塞主流程；3 秒超时兜底
+  let scribbleLoadPromise = null;
+  function loadScribbleBuffer(){
+    if(scribbleLoadPromise) return scribbleLoadPromise;
+    scribbleLoadPromise = (async ()=>{
+      try{
+        const ctx = ensureAudioCtx();
+        // 带超时的 fetch，避免服务器响应慢导致导出卡住
+        const ctrl = new AbortController();
+        const timer = setTimeout(()=>ctrl.abort(), 3000);
+        const resp = await fetch('写字声.mp3?v=2', {signal: ctrl.signal});
+        clearTimeout(timer);
+        if(!resp.ok) throw new Error('http '+resp.status);
+        const arr = await resp.arrayBuffer();
+        scribbleBuffer = await ctx.decodeAudioData(arr);
+        return true;
+      }catch(e){
+        console.warn('写字声解码失败（将用 <audio> 元素兜底）：', e && e.message);
+        scribbleBuffer = null;
+        return false;
+      }
+    })();
+    return scribbleLoadPromise;
+  }
+
+  // 预解码读信录音为 AudioBuffer（导出时用，保证语音也严格跟随 AudioContext 时钟，和画面同步）
+  let voiceLoadPromise = null;
+  function loadVoiceBuffer(){
+    if(voiceLoadPromise) return voiceLoadPromise;
+    voiceLoadPromise = (async ()=>{
+      try{
+        if(!audioObj || !audioObj.src) return false;
+        const ctx = ensureAudioCtx();
+        const ctrl = new AbortController();
+        const timer = setTimeout(()=>ctrl.abort(), 8000);
+        const resp = await fetch(audioObj.src, {signal: ctrl.signal});
+        clearTimeout(timer);
+        if(!resp.ok) throw new Error('http '+resp.status);
+        const arr = await resp.arrayBuffer();
+        voiceBuffer = await ctx.decodeAudioData(arr);
+        return true;
+      }catch(e){
+        console.warn('读信录音解码失败（将回退用 <audio> 元素导出）：', e && e.message);
+        voiceBuffer = null;
+        return false;
+      }
+    })();
+    return voiceLoadPromise;
+  }
+
+  // 播放一小段真实写字声（每亮一个字触发一次）
+  // 优先用 AudioBufferSourceNode（可控、无自动播放策略限制、无 play/pause 冲突）
+  let scribbleStopTimer = null;
+  function playScribble(){
+    if(scribbleToggle.value === 'off') return;
+    const vol = parseInt(scribbleVol.value,10);
+    if(vol <= 0) return;
+
+    const ctx = audioCtx;
+    const ctxOk = ctx && (ctx.state === 'running' || ctx.state === 'suspended');
+
+    // 有解码好的 buffer，且 AudioContext 可用 → 用 AudioBufferSourceNode
+    if(scribbleBuffer && ctxOk){
+      playScribbleViaBuffer(vol);
+      return;
+    }
+
+    // 导出时：优先也走 AudioBuffer（接 exportDest）；无 buffer 才用 <audio> 元素兜底
+    if(exporting){
+      playScribbleViaElement(scribbleAudio, vol);
+      return;
+    }
+
+    // 预览兜底：<audio> 元素
+    playScribbleViaElement(scribbleAudio, vol);
+    if(!scribbleBuffer) loadScribbleBuffer(); // 后台继续解码，下次用 buffer
+  }
+
+  function playScribbleViaBuffer(vol){
+    try{
+      const ctx = ensureAudioCtx();
+      // 关键：AudioContext 可能被浏览器挂起（suspended），每次播放前确保处于 running，否则后半段会静音
+      if(ctx.state !== 'running'){ ctx.resume(); }
+      const src = ctx.createBufferSource();
+      src.buffer = scribbleBuffer;
+      const g = ctx.createGain();
+      g.gain.value = Math.min(1.5, (vol/100) * 2.0);
+      src.connect(g);
+      // 导出时接 exportDest（进视频），预览时接扬声器
+      if(exporting && exportDest){
+        g.connect(exportDest);
+      } else {
+        g.connect(ctx.destination);
+      }
+
+      // 随机起点（避开开头静音段），播约 0.25 秒
+      const dur = scribbleBuffer.duration;
+      let start = 0.05;
+      if(dur > 0.6){ start = 0.05 + Math.random() * (dur - 0.35); }
+      const playLen = 0.25;
+      src.start(0, start, playLen);
+      // 自然停止，无需 pause；但记录以便需要时中断
+      if(scribbleStopTimer) clearTimeout(scribbleStopTimer);
+      scribbleStopTimer = setTimeout(()=>{ try{ src.stop(); }catch(e){} }, playLen*1000 + 60);
+    }catch(e){}
+  }
+
+  function playScribbleViaElement(el, vol){
+    if(!el) return;
+    try{
+      el.volume = Math.min(1, (vol/100) * 2.0);
+      if(el.duration && isFinite(el.duration) && el.duration > 0.6){
+        el.currentTime = 0.05 + Math.random() * (el.duration - 0.35);
+      } else {
+        el.currentTime = 0.05;
+      }
+      const p = el.play();
+      if(p && p.catch){ p.catch((err)=>{ console.warn('写字声播放被拦截：', err && err.message); }); }
+      if(scribbleStopTimer) clearTimeout(scribbleStopTimer);
+      scribbleStopTimer = setTimeout(()=>{ try{ el.pause(); }catch(e){} }, 280);
+    }catch(e){}
+  }
+
+  function stopScribble(){
+    if(scribbleStopTimer){ clearTimeout(scribbleStopTimer); scribbleStopTimer = null; }
+    try{ scribbleAudio.pause(); }catch(e){}
+    if(exportScribbleAudio){ try{ exportScribbleAudio.pause(); }catch(e){} }
+  }
+
+  // 逐字点亮时触发沙沙声（在 tick/animate 里调用）
+  function maybeScribble(curIdx){
+    if(curIdx >= 0 && curIdx !== lastScribbleChar){
+      lastScribbleChar = curIdx;
+      playScribble();
+    }
+  }
+
+  function resetScribble(){
+    lastScribbleChar = -1;
+  }
+
+  function updateRecordBtn(){
+    const hasText = chars.some(c=>c.isChar);
+    const hasAudio = !!audioDuration;
+    btnRecord.disabled = !(hasText && hasAudio);
+    btnExportVideo.disabled = !(hasText && hasAudio) || exporting;
+    btnExportAudio.disabled = !(hasText && hasAudio) || exporting;
+    btnMarkStart.disabled = !(hasText && hasAudio) || marking;
+    btnAutoSync.disabled = !(hasText && hasAudio) || marking || exporting || playing;
+    if(!hasText && !hasAudio) setStatus('就绪','');
+  }
+
+  function setStatus(txt, dot){
+    statusText.textContent = txt;
+    statusDot.className = 'status-dot' + (dot ? ' rec' : '');
+  }
+
+  // ---- 音频加载 ----
+  fileZone.addEventListener('click', ()=> audioInput.click());
+  audioInput.addEventListener('change', ()=>{
+    const f = audioInput.files[0];
+    if(f) loadAudio(f);
+  });
+  ['dragover','dragenter'].forEach(ev=>fileZone.addEventListener(ev, e=>{
+    e.preventDefault(); fileZone.style.borderColor = '#8a6d3b';
+  }));
+  ['dragleave','drop'].forEach(ev=>fileZone.addEventListener(ev, e=>{
+    e.preventDefault(); fileZone.style.borderColor = '';
+  }));
+  fileZone.addEventListener('drop', e=>{
+    const f = e.dataTransfer.files[0];
+    if(f && /audio|video/i.test(f.type)) loadAudio(f);
+  });
+
+  function loadAudio(file){
+    if(audioURL) URL.revokeObjectURL(audioURL);
+    audioURL = URL.createObjectURL(file);
+    audioObj = new Audio(audioURL);
+    // 换了新音频：重置语音 buffer 缓存，避免用到上一次的解码结果
+    voiceBuffer = null;
+    voiceLoadPromise = null;
+    audioObj.addEventListener('loadedmetadata', ()=>{
+      audioDuration = audioObj.duration;
+      if(!isFinite(audioDuration) || audioDuration <= 0){
+        showAudioInfo('读取时长失败，请换一个音频', false);
+        return;
+      }
+      showAudioInfo('音频已载入：<b>'+file.name+'</b> · 时长 <b>'+fmt(audioDuration)+'</b> · 共 <b>'+chars.filter(c=>c.isChar).length+'</b> 个字平均分配', true);
+      fileZone.classList.add('has');
+      totalTime.textContent = fmt(audioDuration);
+      computeTimings();
+      updateRecordBtn();
+      // 提前预热写字声文件，避免播放时才加载导致"后面才有声"
+      try{ scribbleAudio.load(); }catch(e){}
+    });
+    audioObj.addEventListener('error', ()=>{
+      showAudioInfo('音频读取失败，格式可能不支持', false);
+    });
+  }
+
+  function showAudioInfo(html, ok){
+    audioInfo.classList.remove('hidden');
+    audioInfo.innerHTML = html;
+  }
+
+  // ---- 录音 ----
+  let recPaused = false;
+
+  btnRecStart.addEventListener('click', async ()=>{
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      alert('当前浏览器不支持录音，请用 Chrome/Edge 浏览器');
+      return;
+    }
+    try{
+      recStream = await navigator.mediaDevices.getUserMedia({audio:true});
+      const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
+                 : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4'
+                 : '';
+      mediaRecorder = new MediaRecorder(recStream, mime ? {mimeType:mime} : undefined);
+      recChunks = [];
+      recPaused = false;
+      mediaRecorder.ondataavailable = e=>{ if(e.data.size>0) recChunks.push(e.data); };
+      mediaRecorder.onstop = ()=>{
+        const type = mediaRecorder.mimeType || 'audio/webm';
+        recBlob = new Blob(recChunks, {type:type});
+        if(recURL) URL.revokeObjectURL(recURL);
+        recURL = URL.createObjectURL(recBlob);
+        btnRecDownload.disabled = false;
+        btnRecPlay.disabled = false;
+        // 自动作为配音加载
+        const ext = type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm';
+        const fname = '读信配音.' + ext;
+        loadAudio(new File([recBlob], fname, {type:type}));
+        setStatus('录音完成，已作为配音载入','');
+      };
+      mediaRecorder.start();
+      btnRecStart.disabled = true;
+      btnRecStop.disabled = false;
+      btnRecPause.disabled = false;
+      btnRecPause.textContent = '⏸ 暂停';
+      btnRecPlay.disabled = true;
+      setStatus('录音中…','rec');
+    }catch(err){
+      alert('无法访问麦克风：' + err.message + '（请允许浏览器使用麦克风权限）');
+    }
+  });
+
+  // 暂停 / 继续
+  btnRecPause.addEventListener('click', ()=>{
+    if(!mediaRecorder) return;
+    if(!recPaused){
+      if(mediaRecorder.state === 'recording'){
+        mediaRecorder.pause();
+        recPaused = true;
+        btnRecPause.textContent = '▶ 继续';
+        setStatus('录音已暂停','');
+      }
+    } else {
+      mediaRecorder.resume();
+      recPaused = false;
+      btnRecPause.textContent = '⏸ 暂停';
+      setStatus('录音中…','rec');
+    }
+  });
+
+  btnRecStop.addEventListener('click', ()=>{
+    if(mediaRecorder && mediaRecorder.state !== 'inactive'){
+      if(recPaused){ mediaRecorder.resume(); recPaused = false; }
+      mediaRecorder.stop();
+    }
+    if(recStream){
+      recStream.getTracks().forEach(t=>t.stop());
+      recStream = null;
+    }
+    btnRecStart.disabled = false;
+    btnRecStop.disabled = true;
+    btnRecPause.disabled = true;
+    btnRecPause.textContent = '⏸ 暂停';
+  });
+
+  // 回放试听
+  btnRecPlay.addEventListener('click', ()=>{
+    if(!recURL) return;
+    if(recPlayObj && !recPlayObj.paused && !recPlayObj.ended){
+      recPlayObj.pause();
+      btnRecPlay.textContent = '▶ 回放试听';
+      return;
+    }
+    if(!recPlayObj){
+      recPlayObj = new Audio(recURL);
+      recPlayObj.addEventListener('ended', ()=>{
+        btnRecPlay.textContent = '▶ 回放试听';
+      });
+    }
+    recPlayObj.currentTime = 0;
+    recPlayObj.play().then(()=>{
+      btnRecPlay.textContent = '⏸ 停止试听';
+    }).catch(()=>{
+      btnRecPlay.textContent = '▶ 回放试听';
+    });
+  });
+
+  btnRecDownload.addEventListener('click', ()=>{
+    if(!recBlob) return;
+    const a = document.createElement('a');
+    a.href = recURL;
+    const type = recBlob.type || '';
+    const ext = type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : type.includes('wav') ? 'wav' : 'webm';
+    a.download = '读信配音.' + ext;
+    a.click();
+  });
+
+  // ---- 播放 / 逐字 ----
+  function resetChars(){
+    chars.forEach(c=> c.el.classList.remove('on','cur'));
+    bar.style.width = '0%';
+    curTime.textContent = '0.0s';
+  }
+
+  // ---- 打点对时间 ----
+  function startMarking(){
+    if(marking || !audioObj || !audioDuration) return;
+    if(playing){ stopRecord(false); }
+    marking = true;
+    marks = [];
+    markCharIndex = 0;
+    resetChars();
+    // 记录起点（第 0 个字在 0 秒）
+    audioObj.currentTime = 0;
+    audioObj.play().catch(()=>{
+      alert('音频播放失败');
+      stopMarking();
+    });
+    btnMarkStart.disabled = true;
+    btnMarkTap.disabled = false;
+    btnMarkStop.disabled = false;
+    btnRecord.disabled = true;
+    btnExportVideo.disabled = true;
+    setStatus('对时间中…按空格标记','rec');
+    markInfo.innerHTML = '音频播放中，<b>每读完一句/一小段就按一下空格键</b>（或点大按钮）。已标记 <b id="markCount">0</b> 次。';
+    markTick();
+  }
+
+  function markTick(){
+    if(!marking) return;
+    const t = audioObj.currentTime;
+    curTime.textContent = fmt(t);
+    bar.style.width = Math.min(100, (t/audioDuration)*100) + '%';
+    // 打点过程中实时预览：按时间比例点亮字，让用户看到"读到哪了"
+    const ratio = audioDuration > 0 ? t / audioDuration : 0;
+    let curIdx = -1;
+    let cnt = 0;
+    const charCountN = chars.filter(c=>c.isChar).length;
+    chars.forEach((c,i)=>{
+      if(!c.isChar) return;
+      const thisRatio = cnt / Math.max(1, charCountN);
+      cnt++;
+      if(thisRatio <= ratio){ c.el.classList.add('on'); curIdx = i; }
+      else { c.el.classList.remove('on'); }
+    });
+    chars.forEach(c=>c.el.classList.remove('cur'));
+    if(curIdx >= 0) chars[curIdx].el.classList.add('cur');
+
+    if(audioObj.ended || t >= audioDuration + 0.05){
+      finishMarking();
+      return;
+    }
+    requestAnimationFrame(markTick);
+  }
+
+  function tapMark(){
+    if(!marking || !audioObj) return;
+    const t = audioObj.currentTime;
+    // 按当前已过时间比例，估算"此刻已读到第几个字"
+    const charCountN = chars.filter(c=>c.isChar).length;
+    const ratio = audioDuration > 0 ? t / audioDuration : 0;
+    const curChar = Math.min(charCountN, Math.round(charCountN * ratio));
+    if(curChar > markCharIndex){
+      markCharIndex = curChar;
+      marks.push({ t: t, charIdx: curChar });
+      const mc = document.getElementById('markCount');
+      if(mc) mc.textContent = marks.length;
+    }
+  }
+
+  function finishMarking(){
+    if(!marking) return;
+    // 最后一次：把剩余全部字归到当前时间
+    const t = audioObj.currentTime;
+    const charCountN = chars.filter(c=>c.isChar).length;
+    if(markCharIndex < charCountN){
+      marks.push({ t: Math.min(t, audioDuration), charIdx: charCountN });
+    }
+    marking = false;
+    if(audioObj) audioObj.pause();
+    btnMarkStart.disabled = false;
+    btnMarkTap.disabled = true;
+    btnMarkStop.disabled = true;
+    // 生成打点时间表
+    computeTimings();
+    updateRecordBtn();
+    if(marks.length >= 2){
+      setStatus('对时间完成：已按 '+marks.length+' 个点同步','');
+      markInfo.innerHTML = '✅ 对时间完成，共 <b>'+marks.length+'</b> 个时间点。现在点「▶ 预览逐字播放」看效果，满意就导出视频。想重来就再点「开始对时间」。';
+    } else {
+      setStatus('打点太少，已退回平均分配','');
+      marks = [];
+      computeTimings();
+      markInfo.innerHTML = '⚠️ 打点太少（要至少按 2 次），已退回「平均分配」。请重新「开始对时间」并多按几次空格。';
+    }
+  }
+
+  function stopMarking(){
+    marking = false;
+    if(audioObj) audioObj.pause();
+    btnMarkStart.disabled = false;
+    btnMarkTap.disabled = true;
+    btnMarkStop.disabled = true;
+    updateRecordBtn();
+    setStatus('已取消对时间','');
+  }
+
+  btnMarkStart.addEventListener('click', startMarking);
+  btnMarkTap.addEventListener('click', tapMark);
+  btnMarkStop.addEventListener('click', finishMarking);
+
+  // 空格键打点
+  document.addEventListener('keydown', (e)=>{
+    if(e.code === 'Space' && marking){
+      e.preventDefault();
+      tapMark();
+    }
+  });
+
+  // ============ 自动语音识别对时间 ============
+  let autoSyncing = false;
+  let recognition = null;
+  let recogResults = [];   // [{text, start, end}] 每段识别结果（秒）
+  let autoStartTs = 0;     // 音频开始播放时的 performance 时间戳
+
+  function startAutoSync(){
+    if(autoSyncing) return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if(!SR){
+      alert('当前浏览器不支持语音识别，请用 Chrome/Edge 浏览器，且需联网');
+      return;
+    }
+    if(!audioObj || !audioDuration) return;
+
+    autoSyncing = true;
+    recogResults = [];
+    marks = [];
+    resetChars();
+
+    recognition = new SR();
+    recognition.lang = 'zh-CN';
+    recognition.continuous = true;   // 持续识别
+    recognition.interimResults = true; // 拿到中间结果，便于实时
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (event)=>{
+      // 遍历本次结果
+      for(let i=event.resultIndex; i<event.results.length; i++){
+        const res = event.results[i];
+        const isFinal = res.isFinal;
+        const alt = res[0];
+        const text = alt.transcript;
+        // 用音频当前播放时间作为时间戳（识别是实时的，跟着音频走）
+        const t = audioObj.currentTime;
+        if(isFinal){
+          recogResults.push({ text: text, t: t });
+        }
+        // 实时对齐预览（interim + final 都尝试）
+        liveAlign(text, t);
+      }
+    };
+
+    recognition.onerror = (event)=>{
+      if(event.error === 'no-speech') return; // 忽略静音
+      if(event.error === 'aborted') return;
+      // 其他错误提示但不中断
+      setStatus('识别警告：' + event.error, '');
+    };
+
+    recognition.onend = ()=>{
+      // 若还在自动同步中且音频没播完，自动重启识别（continuous 有时会断）
+      if(autoSyncing && !audioObj.ended){
+        try{ recognition.start(); }catch(e){}
+      }
+    };
+
+    // 开始播放音频 + 开始识别
+    setStatus('自动识别中…请保持音频外放','rec');
+    markInfo.innerHTML = '正在外放音频并识别节奏……请确保<b>音频有声音外放</b>、<b>麦克风可用</b>。识别结束会自动生成时间点。';
+    btnAutoSync.disabled = true;
+    btnRecord.disabled = true;
+    btnExportVideo.disabled = true;
+
+    autoStartTs = performance.now();
+    audioObj.currentTime = 0;
+    audioObj.muted = false;  // 必须出声让麦克风听到
+    audioObj.play().catch(()=>{
+      alert('音频播放失败');
+      stopAutoSync(false);
+    });
+
+    recognition.start();
+
+    // 监听音频结束
+    autoSyncTick();
+  }
+
+  function autoSyncTick(){
+    if(!autoSyncing) return;
+    if(audioObj.ended || audioObj.currentTime >= audioDuration + 0.05){
+      finishAutoSync();
+      return;
+    }
+    requestAnimationFrame(autoSyncTick);
+  }
+
+  // 实时对齐：把识别到的文字，和信上的字做匹配，驱动点亮
+  function liveAlign(recognizedText, t){
+    // 去掉标点和空格
+    const recogChars = recognizedText.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g,'').split('');
+    if(recogChars.length === 0) return;
+    // 把识别到的字，按顺序映射到信上未点亮的字
+    const targetChars = chars.filter(c=>c.isChar);
+    let matched = 0;
+    // 简单贪心匹配：逐字对照信上的字
+    let ci = 0;
+    for(const rc of recogChars){
+      // 在信上找下一个相同/相近的字
+      while(ci < targetChars.length){
+        const tch = targetChars[ci].el.textContent;
+        if(tch === rc || (isSimilar(tch, rc))){
+          targetChars[ci].el.classList.add('on');
+          ci++;
+          matched++;
+          break;
+        }
+        ci++;
+      }
+    }
+    // 更新光标
+    chars.forEach(c=>c.el.classList.remove('cur'));
+    if(ci > 0 && ci <= targetChars.length){
+      targetChars[ci-1].el.classList.add('cur');
+    }
+  }
+
+  // 简单相似判断（中文无法轻易做拼音近似，这里仅做相同判断）
+  function isSimilar(a,b){ return a === b; }
+
+  function finishAutoSync(){
+    if(!autoSyncing) return;
+    autoSyncing = false;
+    if(recognition){
+      try{ recognition.onend = null; recognition.onerror = null; recognition.abort(); }catch(e){}
+      recognition = null;
+    }
+    if(audioObj) audioObj.pause();
+
+    // 根据识别结果生成 marks（时间点 -> 已识别到的字数）
+    if(recogResults.length > 0){
+      const targetChars = chars.filter(c=>c.isChar);
+      let charPos = 0;
+      for(const r of recogResults){
+        const rc = r.text.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g,'').length;
+        charPos = Math.min(targetChars.length, charPos + rc);
+        marks.push({ t: Math.min(r.t, audioDuration), charIdx: charPos });
+      }
+      // 确保最后把剩余字归到音频结束
+      if(charPos < targetChars.length){
+        marks.push({ t: audioDuration, charIdx: targetChars.length });
+      }
+    }
+
+    computeTimings();
+    updateRecordBtn();
+    btnAutoSync.disabled = false;
+
+    if(marks.length >= 2){
+      setStatus('自动识别完成：已生成 '+marks.length+' 个时间点','');
+      markInfo.innerHTML = '✅ 自动识别完成，共 <b>'+marks.length+'</b> 个时间点。点「▶ 预览」看效果，满意就导出。若不同步，可改用手动打点。';
+    } else {
+      setStatus('识别结果太少，退回平均分配','');
+      marks = [];
+      computeTimings();
+      markInfo.innerHTML = '⚠️ 识别结果太少（可能没外放/麦克风没声音/网络不通），已退回平均分配。请检查后重试，或用「手动打点」。';
+    }
+    // 把全部字点亮，方便查看最终效果
+    chars.forEach(c=>c.el.classList.add('on'));
+    chars.forEach(c=>c.el.classList.remove('cur'));
+  }
+
+  function stopAutoSync(clearStatus){
+    autoSyncing = false;
+    if(recognition){
+      try{ recognition.onend=null; recognition.onerror=null; recognition.abort(); }catch(e){}
+      recognition = null;
+    }
+    if(audioObj) audioObj.pause();
+    btnAutoSync.disabled = false;
+    updateRecordBtn();
+    if(clearStatus !== false) setStatus('已取消自动识别','');
+  }
+
+  btnAutoSync.addEventListener('click', startAutoSync);
+
+  // 预览播放：和导出用同一套 AudioBuffer + AudioContext 时钟架构，
+  // 语音、画面、沙沙声三者彻底同源，从根上消灭「读到一半画面/沙沙声停、语音还在」的问题。
+  let previewVoiceSrc = null;   // 预览播放时的语音 source 节点
+  let previewVoiceGain = null;
+  let previewT0 = 0;            // 预览画面时钟起点（AudioContext.currentTime）
+
+  async function startRecord(){
+    if(playing || exporting) return;
+    if(!audioObj || !audioDuration) return;
+    computeTimings();
+    resetChars();
+    resetScribble();
+    playing = true;
+    setStatus('播放中…','rec');
+    btnRecord.textContent = '⏸ 播放中';
+    btnRecord.disabled = true;
+
+    try{
+      // 用户手势内强制 AudioContext running
+      const ctx = ensureAudioCtx();
+      if(ctx.state === 'suspended'){ await ctx.resume(); }
+      // 并行预热：写字声 + 语音 AudioBuffer
+      const vbPromise = loadVoiceBuffer();
+      const sbPromise = loadScribbleBuffer();
+      const vbOk = await vbPromise;
+      await sbPromise;
+
+      // 语音：优先 AudioBufferSourceNode（跟 AudioContext 时钟绝对同步）
+      if(vbOk && voiceBuffer){
+        const g = ctx.createGain();
+        g.gain.value = parseInt(voiceVol.value,10) / 100;
+        g.connect(ctx.destination);
+        const src = ctx.createBufferSource();
+        src.buffer = voiceBuffer;
+        src.connect(g);
+        src.start(0);
+        src.onended = ()=>{ if(playing) stopRecord(true); };
+        previewVoiceSrc = src;
+        previewVoiceGain = g;
+        previewT0 = ctx.currentTime;
+      } else {
+        // 回退：<audio> 元素播放
+        audioObj.volume = parseInt(voiceVol.value,10) / 100;
+        audioObj.muted = false;
+        audioObj.currentTime = 0;
+        audioObj.onended = ()=>{ if(playing) stopRecord(true); };
+        const p = audioObj.play();
+        if(p && p.catch) p.catch(()=>{ setStatus('音频播放失败',''); stopRecord(false); });
+        previewT0 = ctx.currentTime;
+      }
+      tick();
+    }catch(e){
+      console.error('预览播放初始化失败', e);
+      setStatus('音频播放失败','');
+      stopRecord(false);
+    }
+  }
+
+  function tick(){
+    if(!playing) return;
+    // 画面时钟：统一用 AudioContext.currentTime（语音 buffer 和它同源，绝对同步）
+    const ctx = audioCtx;
+    const t = ctx ? (ctx.currentTime - previewT0) : audioObj.currentTime;
+    const safeT = (isFinite(t) && t >= 0) ? t : 0;
+    curTime.textContent = fmt(safeT);
+    const progress = audioDuration ? (safeT/audioDuration) : 0;
+    bar.style.width = Math.min(100, progress*100) + '%';
+
+    let curIdx = -1;
+    // 终极可靠点亮：按时间比例点亮字（和导出 animate 完全一致），保证画面一路亮到最后
+    const charCountN = chars.filter(c=>c.isChar).length;
+    const ratio = audioDuration > 0 ? (safeT / audioDuration) : 0;
+    const targetCharPos = Math.floor(ratio * charCountN);
+    let pos = 0;
+    chars.forEach((c,i)=>{
+      if(c.isChar){
+        if(pos < targetCharPos){ c.el.classList.add('on'); curIdx = i; }
+        else { c.el.classList.remove('on'); }
+        pos++;
+      }
+    });
+    chars.forEach(c=>c.el.classList.remove('cur'));
+    if(curIdx >= 0) chars[curIdx].el.classList.add('cur');
+
+    // 触发沙沙声
+    maybeScribble(curIdx);
+
+    if(safeT >= audioDuration + 0.1){
+      stopRecord(true);
+      return;
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function stopRecord(completed){
+    playing = false;
+    if(rafId) cancelAnimationFrame(rafId);
+    rafId = null;
+    // 停止预览语音 source
+    if(previewVoiceSrc){ try{ previewVoiceSrc.stop(); previewVoiceSrc.disconnect(); }catch(e){} previewVoiceSrc = null; }
+    if(previewVoiceGain){ try{ previewVoiceGain.disconnect(); }catch(e){} previewVoiceGain = null; }
+    if(audioObj){ try{ audioObj.pause(); audioObj.onended = null; }catch(e){} }
+    stopScribble(); // 停止写字声，避免录音读完还响
+    btnRecord.textContent = '▶ 预览逐字播放';
+    updateRecordBtn();
+    if(completed){
+      setStatus('播放完成','');
+      chars.forEach(c=>c.el.classList.add('on'));
+      chars.forEach(c=>c.el.classList.remove('cur'));
+      bar.style.width = '100%';
+      curTime.textContent = fmt(audioDuration);
+    }
+  }
+
+  // ---- 导出画面视频 ----
+  // withAudio = true 时，把「读信录音 + 写字沙沙声」一起合进视频
+  let exportDest = null;         // MediaStreamDestination（带声音导出用）
+
+  // 导出画布相关
+  let exportCtx = null;
+  let exportW = 0, exportH = 0; // 画布尺寸（与信纸图一致）
+
+  // 把信纸加载成 canvas 可用的 Image（导出前确保加载完成），带超时保护
+  function ensureExportPaper(){
+    return new Promise((resolve)=>{
+      const img = new Image();
+      const timer = setTimeout(()=>{ resolve(null); }, 5000); // 5秒超时兜底
+      img.onload = ()=>{ clearTimeout(timer); exportW = img.naturalWidth; exportH = img.naturalHeight; resolve(img); };
+      img.onerror = ()=>{ clearTimeout(timer); resolve(null); };
+      img.src = paperImg.src;
+    });
+  }
+
+  // 关键：导出时不再自己重算排版，而是直接读取「预览 DOM 里每个字的真实渲染坐标」，
+  // 按比例映射到 canvas 描一遍。字体/换行/字距/行高/位置全部由浏览器排好，保证所见即所得。
+  // 需要：预览里已经按 charIntervals 点亮好 .on 的字。
+  let stageRectCache = null;
+  // 每个字的画布坐标缓存（导出过程中布局不变，只算一次，避免每帧 getBoundingClientRect 强制重排卡顿）
+  let charCoordCache = null;
+
+  function buildCharCoordCache(){
+    charCoordCache = null;
+    if(!exportCtx) return;
+    const stageRect = letterStage.getBoundingClientRect();
+    stageRectCache = stageRect;
+    const sx = exportW / stageRect.width;
+    const sy = exportH / stageRect.height;
+    // 预览里 .letter 的 line-height = 1.7 * fontSize，文字内容区在行框内垂直居中
+    // 半行距（预览坐标系，CSS px）= (lineHeight - fontSize)/2 = 0.35 * fontSize
+    const fsCss = parseInt(fontSize.value,10);
+    const halfLeading = (fsCss*1.7 - fsCss) / 2; // = 0.35*fs
+    const map = new Map();
+    for(const c of chars){
+      if(!c.isChar) continue;
+      const r = c.el.getBoundingClientRect();
+      const y = (r.top - stageRect.top + halfLeading) * sy;
+      const x = (r.left - stageRect.left) * sx;
+      map.set(c, { x: x, y: y });
+    }
+    charCoordCache = map;
+  }
+
+  function drawFrame(){
+    if(!exportCtx) return;
+    const ctx = exportCtx;
+    const W = exportW, H = exportH;
+    ctx.clearRect(0,0,W,H);
+
+    // 1. 画信纸背景：复刻预览的 object-fit:cover（居中裁切铺满），保证和预览一致
+    const paper = paperImg;
+    if(paper.complete && paper.naturalWidth){
+      const iw = paper.naturalWidth, ih = paper.naturalHeight;
+      const scale = Math.max(W/iw, H/ih);
+      const dw = iw*scale, dh = ih*scale;
+      const dx = (W-dw)/2, dy = (H-dh)/2;
+      ctx.drawImage(paper, dx, dy, dw, dh);
+    } else {
+      ctx.fillStyle = '#f5f0e6';
+      ctx.fillRect(0,0,W,H);
+    }
+
+    // 2. 画文字：用缓存的坐标（导出时布局不变，避免每帧重排）
+    // 字号按水平比例缩放（预览字号的 CSS px → 画布 px）
+    const fs = parseInt(fontSize.value,10) * (W / (stageRectCache ? stageRectCache.width : 1));
+    ctx.font = fs + 'px "HandFont","KaiTi",serif';
+    ctx.fillStyle = inkColor.value;
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+
+    for(const c of chars){
+      if(!c.isChar) continue;
+      if(!c.el.classList.contains('on')) continue; // 未点亮的字不画
+      const p = charCoordCache ? charCoordCache.get(c) : null;
+      if(p){ ctx.fillText(c.ch, p.x, p.y); }
+    }
+  }
+
+  async function exportVideo(withAudio){
+    if(exporting) return;
+    if(!audioObj || !audioDuration) return;
+
+    // 立即进入导出态，让用户看到"导出中"，避免点完按钮后长时间无响应
+    exporting = true;
+    updateRecordBtn();
+    setStatus('导出中…（会实时播一遍，时长≈录音时长，请勿关闭页面）','rec');
+    letterStage.classList.add('exporting');
+
+    // 并行加载信纸 + 字体 + 写字声，取最慢的一个（不再串行等待，最多约 3~5 秒）
+    const fontReady = (async ()=>{
+      if(document.fonts && document.fonts.ready){
+        try{ await Promise.race([document.fonts.ready, new Promise(r=>setTimeout(r,3000))]); }catch(e){}
+      }
+      // 显式确保手写字体真正加载完成（font-display:swap 下 ready 可能提前 resolve，导致测量用 fallback 字体）
+      try{
+        if(document.fonts && document.fonts.load){
+          await Promise.race([
+            document.fonts.load(parseInt(fontSize.value,10)+'px "HandFont"'),
+            new Promise(r=>setTimeout(r,3000))
+          ]);
+        }
+      }catch(e){}
+    })();
+    const paperReady = ensureExportPaper(); // 5 秒超时兜底
+    const scribbleReady = withAudio ? loadScribbleBuffer() : Promise.resolve(true); // 3 秒超时兜底
+    await Promise.all([paperReady, fontReady, scribbleReady]);
+
+    // 关键修复：文字溢出信纸时，自动缩小字号直到放得下，
+    // 否则溢出部分的字坐标超出画布，导出后画面停在前面、后面的字看不见
+    autoFitFont();
+
+    // 设置画布尺寸
+    exportCanvas.width = exportW;
+    exportCanvas.height = exportH;
+    exportCtx = exportCanvas.getContext('2d');
+
+    // canvas 支持 captureStream
+    if(!exportCanvas.captureStream){
+      alert('当前浏览器不支持录制导出，请用 Chrome/Edge 浏览器');
+      exporting = false;
+      updateRecordBtn();
+      letterStage.classList.remove('exporting');
+      setStatus('就绪','');
+      return;
+    }
+
+    // 画面流（来自 canvas）
+    const captureStream = exportCanvas.captureStream(30);
+    let stream = captureStream;
+    let exportAudioEl = null;
+
+    // 带声音：录音 + 沙沙声并进录制流
+    // 关键：语音和写字声都用 AudioBufferSourceNode 播放、接进同一个 AudioContext 的 exportDest，
+    // 这样它们严格跟随 AudioContext 时钟，画面也用 AudioContext.currentTime 推进，三者绝对同步，
+    // 彻底避免 <audio> 元素（createMediaElementSource）的 currentTime 卡住导致画面提前停。
+    if(withAudio){
+      try{
+        const ctx = ensureAudioCtx();
+        exportDest = ctx.createMediaStreamDestination();
+
+        // 语音：优先用解码好的 voiceBuffer（AudioBufferSourceNode），失败则回退 <audio> 元素
+        const vbOk = await loadVoiceBuffer();
+        if(!vbOk || !voiceBuffer){
+          // 回退：用 <audio> 元素接 exportDest（可能仍有时钟不同步问题，但至少能出声）
+          exportAudioEl = new Audio(audioObj.src || audioURL);
+          exportAudioEl.volume = parseInt(voiceVol.value,10) / 100;
+          exportVoiceSrc = ctx.createMediaElementSource(exportAudioEl);
+          exportVoiceSrc.connect(exportDest);
+        }
+
+        // 写字声：也用 AudioBufferSourceNode（scribbleBuffer），导出时接 exportDest
+        await loadScribbleBuffer();
+
+        stream = new MediaStream();
+        captureStream.getVideoTracks().forEach(t=>stream.addTrack(t));
+        exportDest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
+      }catch(e){
+        alert('带声音导出初始化失败：'+e.message+'，已改为无声音导出');
+        withAudio = false;
+        stream = captureStream;
+        cleanupExportAudio();
+      }
+    }
+
+    const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9'
+               : MediaRecorder.isTypeSupported('video/webm;codecs=vp8') ? 'video/webm;codecs=vp8'
+               : MediaRecorder.isTypeSupported('video/webm') ? 'video/webm'
+               : '';
+    const rec = new MediaRecorder(stream, mime ? {mimeType:mime, videoBitsPerSecond:6000000} : undefined);
+    const chunks = [];
+    let watchdog = null; // 导出保险丝定时器（前置声明，避免 onstop 里 TDZ）
+    rec.ondataavailable = e=>{ if(e.data.size>0) chunks.push(e.data); };
+    rec.onstop = ()=>{
+      if(watchdog) clearTimeout(watchdog); // 清除保险丝
+      letterStage.classList.remove('exporting');
+      cleanupExportAudio();
+      const blob = new Blob(chunks, {type: mime || 'video/webm'});
+      const url = URL.createObjectURL(blob);
+      const fname = withAudio ? '手写信视频-带声音.webm' : '手写信视频-画面.webm';
+      exporting = false;
+      updateRecordBtn();
+
+      // 下载：在页面显示「保存视频」按钮，用户点击时弹「另存为」对话框（showSaveFilePicker 需要用户手势，不能在这里直接弹）
+      saveVideo(blob, url, fname);
+      setStatus('导出完成，点下方「保存视频」按钮','');
+    };
+
+    // 保存视频：导出完成后在页面显示「保存视频」按钮，用户点击（用户手势）时弹「另存为」对话框
+    function saveVideo(blob, url, fname){
+      showDownloadLink(blob, url, fname);
+    }
+
+    // 页面里显示保存按钮：用户点它才真正触发「另存为」对话框（showSaveFilePicker 必须在用户手势里调用）
+    function showDownloadLink(blob, url, fname){
+      let box = document.getElementById('downloadBox');
+      if(!box){
+        box = document.createElement('div');
+        box.id = 'downloadBox';
+        box.style.cssText = 'margin:16px 0;padding:16px;background:#2e2a1f;border:1px solid #8a6d3b;border-radius:10px;';
+        // 挂到信纸预览面板的末尾
+        const panel = document.querySelector('.letter-stage').parentNode;
+        panel.appendChild(box);
+      }
+      box.innerHTML = '<div style="font-size:14px;color:#e8d9b0;margin-bottom:12px;font-weight:bold">✅ 视频已生成</div>'
+        + '<button id="btnRealSave" style="display:inline-block;padding:14px 26px;background:#6b4f2a;color:#fff;border-radius:8px;font-size:16px;font-weight:bold;cursor:pointer;border:none">💾 保存视频到本地</button>'
+        + '<a id="btnFallbackSave" href="'+url+'" download="'+fname+'" style="display:inline-block;margin-left:12px;padding:14px 18px;background:#3d3d3d;color:#ccc;border-radius:8px;text-decoration:none;font-size:14px">备用下载</a>'
+        + '<div id="saveHint" style="font-size:12px;color:#9a8f7c;margin-top:10px">点上面的「保存视频」，会弹出系统保存对话框，选好位置即可保存</div>';
+
+      const btnReal = box.querySelector('#btnRealSave');
+      btnReal.addEventListener('click', async ()=>{
+        // 用户手势里调 showSaveFilePicker，能正常弹「另存为」
+        if(window.showSaveFilePicker){
+          try{
+            const handle = await window.showSaveFilePicker({
+              suggestedName: fname,
+              types: [{ description:'WebM 视频', accept:{'video/webm':['.webm']} }]
+            });
+            const w = await handle.createWritable();
+            await w.write(blob);
+            await w.close();
+            const hint = box.querySelector('#saveHint');
+            if(hint) hint.innerHTML = '✅ 已保存成功！文件在你刚才选的位置';
+            hint.style.color = '#7ec87e';
+            setStatus('导出完成，已保存','');
+            setTimeout(()=>URL.revokeObjectURL(url), 2000);
+            return;
+          }catch(err){
+            if(err && err.name === 'AbortError'){
+              const hint = box.querySelector('#saveHint');
+              if(hint) hint.innerHTML = '已取消保存，可再点一次「保存视频」重新选位置';
+              return;
+            }
+            // 其他错误：走备用下载
+          }
+        }
+        // 兜底：showSaveFilePicker 不可用或失败 → 用 a.click 下载
+        try{
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fname;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          const hint = box.querySelector('#saveHint');
+          if(hint) hint.innerHTML = '已触发下载，请查看浏览器下载列表；若没反应，点右侧「备用下载」';
+        }catch(e){
+          const hint = box.querySelector('#saveHint');
+          if(hint) hint.innerHTML = '自动下载失败，请点右侧「备用下载」链接手动保存';
+        }
+      });
+    }
+
+    // 时钟音频：带声音用独立 exportAudioEl，无声音用 audioObj
+    const clockAudio = (withAudio && exportAudioEl) ? exportAudioEl : audioObj;
+
+    // 带声音导出：先确保写字声已加载（有超时兜底，不会卡死），再开始录制
+    // 关键修复：导出时以「语音实际解码时长」为准，避免 <audio> 元数据时长和真实时长不一致
+    // 导致画面时钟与语音不同步、字提前停。
+    if(withAudio && voiceBuffer && voiceBuffer.duration > 0){
+      // 用实际解码时长覆盖元数据时长（两者通常一致，但不一致时以实际为准）
+      if(Math.abs(voiceBuffer.duration - audioDuration) > 0.5){
+        audioDuration = voiceBuffer.duration;
+        totalTime.textContent = fmt(audioDuration);
+      }
+    }
+    computeTimings();
+    resetScribble();
+    // 画第一帧（空信纸）：先清空点亮，再照抄预览坐标
+    resetChars();
+    buildCharCoordCache(); // 预计算每个字的画布坐标（导出全程只算一次）
+    drawFrame();
+
+    // 带声音导出：确保 AudioContext 处于 running，否则 ctx.currentTime 不前进，画面时钟会卡住
+    if(withAudio){
+      try{
+        const c = ensureAudioCtx();
+        if(c.state === 'suspended'){ await c.resume(); }
+      }catch(e){}
+    }
+
+    // 全部就绪后才开始录制，避免录制中途卡住导致状态栏一直"导出中"
+    rec.start();
+
+    // 保险丝：无论如何，超过「录音时长 + 15 秒」强制收尾，防止任何意外导致导出卡死
+    watchdog = setTimeout(()=>{
+      if(exporting && rec && rec.state !== 'inactive'){
+        try{ clockAudio.pause(); }catch(e){}
+        try{ rec.stop(); }catch(e){}
+        try{ captureStream.getTracks().forEach(tr=>tr.stop()); }catch(e){}
+      }
+    }, (audioDuration + 15) * 1000);
+
+    // ===== 开始播放 + 动画循环 =====
+    // 带声音：语音用 AudioBufferSourceNode 播放（严格跟 AudioContext 时钟），画面用 ctx.currentTime 推进 → 三者绝对同步
+    // 无声音：语音用 audioObj（<audio>）静音播放，画面用墙钟时间推进
+    let voiceSrc = null;
+    let voiceGain = null;
+
+    const startAnimation = ()=>{
+      const ctx = withAudio ? ensureAudioCtx() : null;
+      // t0：画面时钟起点。带声音 = 语音 AudioBufferSource 真正 start 的时刻（AudioContext 时钟）
+      const t0 = ctx ? ctx.currentTime : performance.now()/1000;
+
+      // 带声音且语音走 AudioBuffer 时，在 t0 精确启动语音
+      if(withAudio && voiceBuffer && exportDest && !exportAudioEl){
+        try{
+          voiceSrc = ctx.createBufferSource();
+          voiceSrc.buffer = voiceBuffer;
+          voiceGain = ctx.createGain();
+          voiceGain.gain.value = parseInt(voiceVol.value,10) / 100;
+          voiceSrc.connect(voiceGain);
+          voiceGain.connect(exportDest);
+          // 语音自然播完时，立即收尾（满字 + 停止录制），作为画面收尾的权威信号
+          voiceSrc.onended = ()=>{
+            if(exporting){
+              // 满字 + 收尾
+              chars.forEach(c=>c.el.classList.add('on'));
+              chars.forEach(c=>c.el.classList.remove('cur'));
+              drawFrame();
+              stopScribble();
+              setTimeout(()=>{
+                try{ clockAudio.pause(); }catch(e){}
+                if(!withAudio) clockAudio.muted = false;
+                try{ rec.stop(); }catch(e){}
+                try{ captureStream.getTracks().forEach(tr=>tr.stop()); }catch(e){}
+              }, 300);
+            }
+          };
+          voiceSrc.start(0); // 立即在 AudioContext 时钟当前时刻启动
+        }catch(e){
+          console.warn('语音 AudioBuffer 播放失败，回退 <audio>：', e && e.message);
+        }
+      } else if(withAudio && exportAudioEl){
+        // 回退路径：<audio> 元素播放（接 exportDest）
+        exportAudioEl.currentTime = 0;
+        exportAudioEl.play().catch(()=>{});
+      } else {
+        // 无声音：audioObj 静音播放
+        clockAudio.currentTime = 0;
+        clockAudio.muted = true;
+        clockAudio.play().catch(()=>{});
+      }
+
+      const animate = ()=>{
+        if(!exporting){ return; }
+        // 当前播放进度（秒）
+        let t;
+        if(ctx){
+          t = ctx.currentTime - t0; // AudioContext 时钟（带声音，语音严格跟它）
+        } else {
+          t = performance.now()/1000 - t0; // 墙钟时间（无声音）
+        }
+        const safeT = (isFinite(t) && t >= 0) ? Math.min(t, audioDuration) : 0;
+        curTime.textContent = fmt(safeT);
+        bar.style.width = Math.min(100, (safeT/audioDuration)*100) + '%';
+
+        // 终极可靠点亮：按时间比例点亮字，保证画面一路亮到最后，不受 marks 错位影响
+        let curIdx = -1;
+        const charCountN = chars.filter(c=>c.isChar).length;
+        const ratio = audioDuration > 0 ? (safeT / audioDuration) : 0;
+        const targetCharPos = Math.floor(ratio * charCountN);
+        let pos = 0;
+        chars.forEach((c,i)=>{
+          if(c.isChar){
+            if(pos < targetCharPos){ c.el.classList.add('on'); curIdx = i; }
+            else { c.el.classList.remove('on'); }
+            pos++;
+          }
+        });
+        chars.forEach(c=>c.el.classList.remove('cur'));
+        if(curIdx >= 0) chars[curIdx].el.classList.add('cur');
+
+        // 照抄预览坐标画进 canvas（所见即所得）
+        drawFrame();
+
+        // 沙沙声
+        if(withAudio){ maybeScribble(curIdx); }
+
+        // 播放到结尾就收尾
+        if(safeT >= audioDuration - 0.05 && audioDuration > 0){
+          // 满字
+          chars.forEach(c=>c.el.classList.add('on'));
+          chars.forEach(c=>c.el.classList.remove('cur'));
+          drawFrame();
+          stopScribble(); // 停止写字声
+          setTimeout(()=>{
+            try{ if(voiceSrc) voiceSrc.stop(); }catch(e){}
+            try{ clockAudio.pause(); }catch(e){}
+            if(!withAudio) clockAudio.muted = false;
+            rec.stop();
+            captureStream.getTracks().forEach(tr=>tr.stop());
+          }, 400);
+          return;
+        }
+        requestAnimationFrame(animate);
+      };
+      requestAnimationFrame(animate);
+    };
+
+    // 无声音时直接开始；带声音时若无 AudioBuffer 语音则走 <audio> 回退
+    startAnimation();
+  }
+
+  function cleanupExportAudio(){
+    if(exportScribbleSrc){ try{ exportScribbleSrc.disconnect(); }catch(e){} exportScribbleSrc = null; }
+    if(exportScribbleAudio){ try{ exportScribbleAudio.pause(); }catch(e){} exportScribbleAudio = null; }
+    if(exportVoiceSrc){ try{ exportVoiceSrc.disconnect(); }catch(e){} exportVoiceSrc = null; }
+    exportDest = null;
+  }
+
+  function resetAll(){
+    if(playing) stopRecord(false);
+    if(marking) stopMarking();
+    if(autoSyncing) stopAutoSync(false);
+    if(exporting) return;
+    marks = [];
+    markCharIndex = 0;
+    resetChars();
+    setStatus('就绪','');
+  }
+
+  // ---- 文字块拖动 / 缩放 / 记忆 ----
+  function applyPos(){
+    letterStage.style.setProperty('--lx', pos.lx + '%');
+    letterStage.style.setProperty('--ty', pos.ty + '%');
+    letterStage.style.setProperty('--wd', pos.wd + '%');
+    posLeft.textContent  = pos.lx.toFixed(1) + '%';
+    posTop.textContent   = pos.ty.toFixed(1) + '%';
+    posWidth.textContent = pos.wd.toFixed(1) + '%';
+  }
+  function savePos(){
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(pos)); }catch(e){}
+    setStatus('位置已保存','');
+  }
+  function loadPos(){
+    try{
+      const s = localStorage.getItem(STORE_KEY);
+      if(s){ const p = JSON.parse(s); if(p && typeof p.lx==='number') pos = p; }
+    }catch(e){}
+    applyPos();
+  }
+  function clampPos(){
+    pos.lx = Math.max(0, Math.min(100 - pos.wd, pos.lx));
+    pos.ty = Math.max(0, Math.min(95, pos.ty));
+    pos.wd = Math.max(10, Math.min(100, pos.wd));
+  }
+
+  // 拖动整体
+  writeArea.addEventListener('mousedown', (e)=>{
+    if(e.target.classList && e.target.classList.contains('resize-h')) return; // 交给缩放手柄
+    if(playing || exporting) return;
+    e.preventDefault();
+    const rect = letterStage.getBoundingClientRect();
+    const startX = e.clientX, startY = e.clientY;
+    const startLx = pos.lx, startTy = pos.ty;
+    writeArea.classList.add('dragging');
+    function onMove(ev){
+      const dx = (ev.clientX - startX) / rect.width * 100;
+      const dy = (ev.clientY - startY) / rect.height * 100;
+      pos.lx = startLx + dx;
+      pos.ty = startTy + dy;
+      clampPos();
+      applyPos();
+    }
+    function onUp(){
+      writeArea.classList.remove('dragging');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  // 左右拉宽
+  document.querySelectorAll('.resize-h').forEach(h=>{
+    h.addEventListener('mousedown', (e)=>{
+      if(playing || exporting) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const side = h.dataset.side;
+      const rect = letterStage.getBoundingClientRect();
+      const startX = e.clientX;
+      const startLx = pos.lx, startWd = pos.wd;
+      function onMove(ev){
+        const dx = (ev.clientX - startX) / rect.width * 100;
+        if(side === 'r'){
+          pos.wd = startWd + dx;
+        } else {
+          pos.wd = startWd - dx;
+          pos.lx = startLx + dx;
+        }
+        clampPos();
+        applyPos();
+      }
+      function onUp(){
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  });
+
+  btnSavePos.addEventListener('click', savePos);
+  btnResetPos.addEventListener('click', ()=>{
+    pos = { ...DEFAULT_POS };
+    applyPos();
+    setStatus('已恢复默认位置','');
+  });
+
+  // ---- 事件 ----
+  textEl.addEventListener('input', ()=>{
+    renderText();
+    if(audioObj && audioDuration){
+      computeTimings();
+      showAudioInfo('音频已载入 · 时长 <b>'+fmt(audioDuration)+'</b> · 共 <b>'+chars.filter(c=>c.isChar).length+'</b> 个字平均分配', true);
+    }
+  });
+  fontSize.addEventListener('input', ()=>{ applyFontSize(); scheduleOverflowHint(); });
+  inkColor.addEventListener('change', applyInk);
+  btnRecord.addEventListener('click', startRecord);
+  btnExportVideo.addEventListener('click', ()=> exportVideo(false));
+  btnExportAudio.addEventListener('click', ()=> exportVideo(true));
+  btnReset.addEventListener('click', resetAll);
+
+  // 音量调节
+  scribbleVol.addEventListener('input', ()=>{
+    scribbleVolVal.textContent = scribbleVol.value;
+    // 实际音量由 playScribble 里的包络实时读取 scribbleVol.value 控制，这里只更新显示
+  });
+  voiceVol.addEventListener('input', ()=>{
+    voiceVolVal.textContent = voiceVol.value;
+    if(audioObj) audioObj.volume = parseInt(voiceVol.value,10)/100;
+  });
+
+  // ---- 换信纸图案 ----
+  paperZone.addEventListener('click', ()=> paperInput.click());
+  paperInput.addEventListener('change', ()=>{
+    const f = paperInput.files[0];
+    if(f) loadPaper(f);
+  });
+  ['dragover','dragenter'].forEach(ev=>paperZone.addEventListener(ev, e=>{
+    e.preventDefault(); paperZone.style.borderColor = '#8a6d3b';
+  }));
+  ['dragleave','drop'].forEach(ev=>paperZone.addEventListener(ev, e=>{
+    e.preventDefault(); paperZone.style.borderColor = '';
+  }));
+  paperZone.addEventListener('drop', e=>{
+    const f = e.dataTransfer.files[0];
+    if(f && /image/i.test(f.type)) loadPaper(f);
+  });
+
+  function loadPaper(file){
+    if(!/image/i.test(file.type)){
+      alert('请上传图片文件（jpg/png）');
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    paperImg.onload = ()=>{
+      URL.revokeObjectURL(url);
+      paperHint.textContent = '当前信纸：' + file.name;
+      paperZone.classList.add('has');
+    };
+    paperImg.src = url;
+  }
+
+  // ---- 初始化 ----
+  renderText();
+  applyFontSize();
+  applyInk();
+  loadPos();
+  setStatus('就绪','');
+})();
+</script>
+</body>
+</html>
